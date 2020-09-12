@@ -11,7 +11,7 @@ const wtf = <App />;
 
 ReactDOM.render(wtf, document.getElementById("root"));
 
-let rootFiber = root._reactRootContainer._internalRoot;
+// let rootFiber = root._reactRootContainer._internalRoot;
 
 // getSet(rootFiber, "current");
 // console.log("ROOT FIBER", rootFiber);
@@ -113,8 +113,8 @@ let rootFiber = root._reactRootContainer._internalRoot;
 //         payload.call(inst, inst.state), // passing inst.state since the context is not create until now.
 //       );
 
-//       const updateAction = payload.call(inst,inst.state);
-//       cb(updateAction, payload, inst, inst.state)
+//       const updateAction = payload.call(inst, inst.state);
+//       cb(updateAction, payload, inst, inst.state);
 //     } else {
 //       console.log(
 //         "setState payload - with object update",
@@ -155,9 +155,6 @@ let rootFiber = root._reactRootContainer._internalRoot;
 //   });
 //   console.log(obj, "after attaching setter getter");
 // }
-
-/* eslint-disable no-underscore-dangle */
-/* eslint-disable consistent-return */
 
 let changes = [];
 
@@ -439,11 +436,3 @@ function SpyUseState(obj, method, cb) {
 }
 
 mountToReactRoot(root);
-
-// module.exports = {
-//   mountToReactRoot,
-//   getAllSlowComponentRenders,
-//   // traverseWith,
-//   getComponentRenderTime,
-//   getTotalRenderCount,
-// };
