@@ -10,10 +10,13 @@ class App extends React.Component {
     total: null,
     next: null,
     operation: null,
+    visible: false,
   };
 
   handleClick = buttonName => {
-    this.setState(calculate(this.state, buttonName));
+    this.setState({
+      ...calculate(this.state, buttonName),
+    });
     // this.setState(calculate(this.state, buttonName));
     // this.setState(prevState => {
     //   return calculate(prevState, buttonName);
@@ -26,9 +29,15 @@ class App extends React.Component {
   render() {
     return (
       <div className="component-app">
-        {/* <Display value={this.state.next || this.state.total || "0"} /> */}
-        {/* <ButtonPanel clickHandler={this.handleClick} /> */}
-        <Test />
+        {this.state.visible ? (
+          <Test />
+        ) : (
+          <>
+            <Display value={this.state.next || this.state.total || "0"} />
+            <ButtonPanel clickHandler={this.handleClick} />{" "}
+          </>
+        )}
+        {/* <Test /> */}
       </div>
     );
   }

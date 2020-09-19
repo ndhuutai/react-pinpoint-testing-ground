@@ -21,142 +21,9 @@ ReactDOM.render(wtf, document.getElementById("root"));
 // // the workInProgress tree and assign it to the instance of stateNode
 // // then after checks a newState assigns to state again.
 
-// const traverseWith = (fiber, cb) => {
-//   fiber.elementType && cb(fiber);
-//   fiber.child && traverseWith(fiber.child, cb);
-//   fiber.sibling && traverseWith(fiber.sibling, cb);
-// };
-
-// traverseWith(rootFiber.current, fiber => {
-//   // if (fiber.tag === 0 && !fiber.stateNode && fiber.memoizedState) {
-//   //   // pass in "queue" obj to spy on dispatch func
-//   //   console.log("attaching a spy", fiber.memoizedState.queue);
-//   //   getSet(fiber.memoizedState, "baseState");
-//   //   // getSet(fiber.memoizedState, "baseUpdate");
-//   //   // getSet(fiber.memoizedState, "memoizedState");
-//   //   // getSet(fiber.memoizedState, "next");
-//   //   SpyUseState(fiber.memoizedState.queue, "dispatch");
-//   //   SpyUseState(fiber.memoizedState.queue, "lastRenderedReducer");
-//   // }
-//   if (
-//     (fiber.tag === 1 || fiber.tag === 5) &&
-//     fiber.stateNode &&
-//     fiber.stateNode.state
-//   ) {
-//     // let spy = Spy(fiber.stateNode.updater, 'enqueueSetState')
-//     /*
-//       enqueueReplaceState (inst, payload, callback)
-//       enqueueForceUpdate (inst, callback)
-//       enqueueSetState    (inst, payload, callback)
-//     */
-//     if (fiber.stateNode.updater) {
-//       Spy(fiber.stateNode.updater, "enqueueSetState");
-//       Spy(fiber.stateNode.updater, "enqueueReplaceState");
-//       Spy(fiber.stateNode.updater, "enqueueForceUpdate");
-//     }
-//     // fiber.stateNode._state = fiber.stateNode.state;
-//     // fiber.stateNode._props = fiber.stateNode.props;
-//     // Object.defineProperty(fiber.stateNode, "state", {
-//     //   get() {
-//     //     return this._state;
-//     //   },
-//     //   set(val) {
-//     //     this._state = val;
-//     //     console.log("state after", this._state);
-//     //     // console.trace();
-//     //   },
-//     // });
-//     // Object.defineProperty(fiber.stateNode, "props", {
-//     //   get() {
-//     //     return this._props;
-//     //   },
-//     //   set(val) {
-//     //     this._props = val;
-//     //   },
-//     // });
-//     getSet(fiber.stateNode, "state");
-//     if (fiber.updateQueue) {
-//       getSet(fiber.updateQueue, "firstEffect");
-//     }
-//     // getSet(fiber.stateNode, "props");
-//   }
-// });
-
-// function SpyUseState(obj, method) {
-//   // let spy = {
-//   //   args: [],
-//   // };
-
-//   let original = obj[method];
-//   obj[method] = function(...args) {
-//     console.log(method, "was called");
-//     console.log(args, "arguments");
-//     return original.call(obj, ...args);
-//   };
-
-//   // return spy;
-// }
-
-// function Spy(obj, method, cb) {
-//   let spy = {
-//     args: [],
-//   };
-
-//   let original = obj[method];
-//   obj[method] = function(inst, payload, originalCb) {
-//     console.log(method);
-//     // console.log("payload", payload);
-//     if (typeof payload === "function") {
-//       // console.log("inst", lodash.cloneDeep(inst.state));
-//       console.log(
-//         "setState payload - with updater function",
-//         payload.call(inst, inst.state), // passing inst.state since the context is not create until now.
-//       );
-
-//       const updateAction = payload.call(inst, inst.state);
-//       cb(updateAction, payload, inst, inst.state);
-//     } else {
-//       console.log(
-//         "setState payload - with object update",
-//         payload, // passing inst.state since the context is not create until now.
-//       );
-//     }
-//     // console.log("cb", cb);
-//     // console.log("payload name", JSON.stringify(payload));
-//     return original.call(obj, inst, payload, originalCb);
-//   };
-
-//   return spy;
-// }
-
-// function getSet(obj, propName) {
-//   // fiber.stateNode._state = fiber.stateNode.state;
-//   // Object.defineProperty(fiber.stateNode, "state", {
-//   //   get() {
-//   //     return this._state;
-//   //   },
-//   //   set(val) {
-//   //     this._state = val;
-//   //     console.log("state after", this._state);
-//   //     // console.trace();
-//   //   },
-//   // });
-//   const newPropName = `_${propName}`;
-//   obj[newPropName] = obj[propName];
-//   Object.defineProperty(obj, propName, {
-//     get() {
-//       return this[newPropName];
-//     },
-//     set(newVal) {
-//       this[newPropName] = newVal;
-//       console.log(`${obj} ${propName}`, this[newPropName]);
-//       // console.trace();
-//     },
-//   });
-//   console.log(obj, "after attaching setter getter");
-// }
-
 let changes = [];
+const processedFibers = new WeakMap();
+const fiberMap = new Map();
 
 function mountToReactRoot(reactRoot) {
   // Reset changes
@@ -165,7 +32,11 @@ function mountToReactRoot(reactRoot) {
   // Lift parent of react fibers tree
   const parent = reactRoot._reactRootContainer._internalRoot;
 
+  console.log("ROOT FIBER", parent.current);
   changes.push(new Tree(parent.current));
+  // after initial
+  // console.log("Initial processed fibers", processedFibers);
+  console.log("initial fiberMap", fiberMap);
 
   // Add listener to react fibers tree so changes can be recorded
   getSet(parent, "current");
@@ -185,7 +56,11 @@ function getSet(obj, propName) {
       this[newPropName] = newVal;
       console.log(`${obj} ${propName}`, this[newPropName]);
       changes.push(new Tree(this[newPropName]));
-      console.log(changes);
+      console.log("CHANGES", changes);
+      console.log("Fiber STORE: ", processedFibers);
+      // console.log("testweakset after", testWeakSet);
+      // console.log("statenodeweakset", stateNodeWeakSet);
+      console.log("fiber map:", fiberMap);
       getTotalRenderCount();
     },
   });
@@ -197,23 +72,8 @@ function getSet(obj, propName) {
  */
 function getAllSlowComponentRenders(threshold) {
   const slowRenders = changes;
-  // .map(flattenTree) // Flatten tree
-  // .flat() // Flatten 2d array into 1d array
-  // .filter(fiber => checkTime(fiber, threshold)) // filter out all that don't meet threshold
-  // .map(parseCompletedNode); // removes circular references so puppeteer can stringify before sending back
   return slowRenders;
 }
-
-// function flattenTree(tree) {
-//   // Closured array for storing fibers
-//   const arr = [];
-//   // Closured callback for adding to arr
-//   const callback = fiber => {
-//     arr.push(fiber);
-//   };
-//   traverseWith(tree, callback);
-//   return arr;
-// }
 
 function checkTime(fiber, threshold) {
   return fiber.selfBaseDuration > threshold;
@@ -222,13 +82,7 @@ function checkTime(fiber, threshold) {
 function getComponentRenderTime(componentName) {
   console.log("changes", changes);
   console.log("component name", componentName);
-  // console.log(
-  //   changes
-  //     .map(change => change.componentList)
-  //     .reduce((acc, change) => {
-  //       return [...acc, ...change];
-  //     }, []),
-  // );
+
   return "what";
 }
 
@@ -240,11 +94,15 @@ function getTotalRenderCount() {
   // for each tree
   // check if the current component exist in the map before adding on or creating a new key
   changes.forEach(commit => {
-    commit.componentList.forEach(component => {
+    commit.componentList.forEach((component, index) => {
       if (!componentMap.has(component.uID)) {
-        componentMap.set(component.uID, { ...component, renderCount: 1 });
+        componentMap.set(component.uID, { renderCount: 1 });
       } else {
-        if (component.effectTag !== 0) {
+        if (
+          component.effectTag !== 0 ||
+          component.selfBaseDuration !==
+            commit.componentList[index ? index - 1 : 0]
+        ) {
           componentMap.get(component.uID).renderCount += 1;
         }
       }
@@ -253,8 +111,12 @@ function getTotalRenderCount() {
   console.log("render map", componentMap);
 }
 
+const testWeakSet = new WeakSet();
+const stateNodeWeakSet = new WeakSet();
+
 class TreeNode {
   constructor(fiberNode, uID) {
+    this.uID = uID;
     const {
       elementType,
       selfBaseDuration,
@@ -262,6 +124,7 @@ class TreeNode {
       memoizedProps,
       effectTag,
       tag,
+      ref,
       updateQueue,
       stateNode,
     } = fiberNode;
@@ -270,8 +133,8 @@ class TreeNode {
     this.memoizedProps = memoizedProps;
     this.memoizedState = memoizedState;
     this.effectTag = effectTag;
+    this.ref = ref;
     this.updateQueue = updateQueue; // seems to be replaced entirely and since it exists directly under a fiber node, it can't be modified.
-    this.uID = uID;
     this.tag = tag;
     this.updateList = [];
 
@@ -296,9 +159,12 @@ class TreeNode {
         const cb = (update, payload) => {
           this.updateList.push([update, payload]);
         };
-        Spy(this.stateNode.updater, "enqueueSetState", cb);
-        Spy(this.stateNode.updater, "enqueueReplaceState", cb);
-        Spy(this.stateNode.updater, "enqueueForceUpdate", cb);
+        if (!stateNodeWeakSet.has(this.stateNode)) {
+          stateNodeWeakSet.add(this.stateNode);
+          Spy(this.stateNode.updater, "enqueueSetState", cb);
+          Spy(this.stateNode.updater, "enqueueReplaceState", cb);
+          Spy(this.stateNode.updater, "enqueueForceUpdate", cb);
+        }
       }
     }
 
@@ -313,8 +179,12 @@ class TreeNode {
       const cb = (...args) => {
         this.updateList.push([...args]);
       };
-      SpyUseState(memoizedState.queue, "dispatch", cb);
-      SpyUseState(memoizedState.queue, "lastRenderedReducer", cb);
+      //type is function and thus it's unique
+      if (!testWeakSet.has(fiberNode.type)) {
+        testWeakSet.add(fiberNode.type);
+        SpyUseState(memoizedState.queue, "dispatch", cb);
+        SpyUseState(memoizedState.queue, "lastRenderedReducer", cb);
+      }
     }
   }
 
@@ -323,8 +193,9 @@ class TreeNode {
     this.child = treeNode;
   }
 
-  addSibling(node) {
+  addSibling(treeNode) {
     // if (!node) return;
+    this.sibling = treeNode;
   }
 
   addParent(node) {
@@ -339,7 +210,7 @@ class Tree {
   // uniqueId is used to identify a fiber to then help with counting re-renders
   // componentList
   constructor(rootNode) {
-    this.uniqueId = 0;
+    this.uniqueId = fiberMap.size;
     this.componentList = [];
     this.effectList = [];
     this.root = null;
@@ -347,31 +218,49 @@ class Tree {
   }
 
   processNode(fiberNode, previousTreeNode) {
-    // Reference list:
-    // export const FunctionComponent = 0;
-    // export const ClassComponent = 1;
-    // export const IndeterminateComponent = 2; // Before we know whether it is function or class
-    // export const HostRoot = 3; // Root of a host tree. Could be nested inside another node.
-    // export const HostPortal = 4; // A subtree. Could be an entry point to a different renderer.
-    // export const HostComponent = 5;
-    // export const HostText = 6;
-    // export const Fragment = 7;
-    // export const Mode = 8;
-    // export const ContextConsumer = 9;
-    // export const ContextProvider = 10;
-    // export const ForwardRef = 11;
-    // export const Profiler = 12;
-    // export const SuspenseComponent = 13;
-    // export const MemoComponent = 14;
-    // export const SimpleMemoComponent = 15;
-    // export const LazyComponent = 16;
+    // id used to reference a fiber in fiberMap
+    let id = undefined;
+    // using a unique part of each fiber to identify it.
+    // both current and alternate only 1 reference to this unique part
+    // which we can use to uniquely identify a fiber node even in the case
+    // of current and alternate switching per commit/
+    let uniquePart = undefined;
+
+    // unique part of a fiber node depends on its type.
+    if (fiberNode.tag === 0) {
+      uniquePart = fiberNode.elementType;
+    } else if (fiberNode.tag === 3) {
+      uniquePart = fiberNode.memoizedState.element.type;
+    } else {
+      uniquePart = fiberNode.stateNode;
+    }
+    // if this is a unique fiber (that both "current" and "alternate" fiber represents)
+    // then add to the processedFiber to make sure we don't re-account this fiber.
+    if (!processedFibers.has(uniquePart)) {
+      // processedFibers.add(fiberNode);
+      // componentMap.set(this.uniqueId, fiberNode);
+      this.uniqueId++;
+      id = this.uniqueId;
+
+      fiberMap.set(id, fiberNode);
+      if (fiberNode.tag === 0) {
+        processedFibers.set(fiberNode.elementType, id);
+      } else if (fiberNode.tag === 3) {
+        processedFibers.set(fiberNode.memoizedState.element.type, id);
+      } else {
+        processedFibers.set(fiberNode.stateNode, id);
+      }
+    } else {
+      id = processedFibers.get(uniquePart);
+    }
 
     // If it's a HostRoot with a tag of 3
     // create a new TreeNode
     if (fiberNode.tag === 3) {
-      this.root = new TreeNode(fiberNode, this.uniqueId);
+      this.root = new TreeNode(fiberNode, id);
+      // this.root = new TreeNode(fiberNode, this.uniqueId);
       this.componentList.push({ ...this.root }); // push a copy
-      this.uniqueId++;
+      // this.uniqueId++;
 
       if (fiberNode.child) {
         // const newNode = new TreeNode(fiberNode.child, this.uniqueId);
@@ -381,17 +270,59 @@ class Tree {
         this.processNode(fiberNode.child, this.root);
       }
     } else {
-      const newNode = new TreeNode(fiberNode, this.uniqueId);
+      const newNode = new TreeNode(fiberNode, id);
+      // const newNode = new TreeNode(fiberNode, this.uniqueId);
       previousTreeNode.addChild(newNode);
       this.componentList.push({ ...newNode });
-      this.uniqueId++;
+      // this.uniqueId++;
 
       if (fiberNode.child) {
         this.processNode(fiberNode.child, newNode);
       }
       if (fiberNode.sibling) {
-        // do same thing for sibling
+        this.processSiblingNode(fiberNode.sibling, newNode);
       }
+    }
+  }
+
+  processSiblingNode(fiberNode, previousTreeNode) {
+    let uniquePart = undefined;
+    let id = undefined;
+    if (fiberNode.tag === 0) {
+      uniquePart = fiberNode.elementType;
+    } else if (fiberNode.tag === 3) {
+      uniquePart = fiberNode.memoizedState.element.type;
+    } else {
+      uniquePart = fiberNode.stateNode;
+    }
+    if (!processedFibers.has(uniquePart)) {
+      // processedFibers.add(fiberNode);
+      // componentMap.set(this.uniqueId, fiberNode);
+      this.uniqueId++;
+      id = this.uniqueId;
+      fiberMap.set(id, fiberNode);
+      if (fiberNode.tag === 0) {
+        processedFibers.set(fiberNode.elementType, id);
+      } else if (fiberNode.tag === 3) {
+        processedFibers.set(fiberNode.memoizedState.element.type, id);
+      } else {
+        processedFibers.set(fiberNode.stateNode, id);
+      }
+    } else {
+      id = processedFibers.get(uniquePart);
+    }
+
+    const newNode = new TreeNode(fiberNode, id);
+    // const newNode = new TreeNode(fiberNode, this.uniqueId);
+    previousTreeNode.addSibling(newNode);
+    this.componentList.push({ ...newNode });
+    // this.uniqueId++;
+
+    if (fiberNode.child) {
+      this.processNode(fiberNode.child, newNode);
+    }
+    if (fiberNode.sibling) {
+      this.processSiblingNode(fiberNode.sibling, newNode);
     }
   }
 }
@@ -436,3 +367,61 @@ function SpyUseState(obj, method, cb) {
 }
 
 mountToReactRoot(root);
+
+// changes[0].root.child.stateNode.setState({
+//   total: 0,
+//   next: 10,
+//   operation: null,
+// });
+
+console.log("processed fibers", processedFibers);
+// console.log("testWeakSET:", testWeakSet);
+// console.log("stateNodeWeakSet", stateNodeWeakSet);
+// console.log(processedFibers.get(2));
+
+// setTimeout(() => {
+//   processedFibers.get(2).stateNode.setState({
+//     total: "0",
+//     next: "10",
+//     operation: null,
+//   });
+// }, 4000);
+
+// setTimeout(() => {
+//   processedFibers.get(4).memoizedState.queue.dispatch(1);
+// }, 4000);
+
+// setTimeout(() => {
+//   processedFibers.get(4).memoizedState.queue.dispatch(3);
+// }, 6000);
+
+// maybe i should have a weak set to determine whether a fiber is processed
+// add/change fiber depends on the order/time that it was called
+
+// 1st commit -> add to WeakSet-1
+// 2nd commit -> add to WeakSet2
+// 3rd commit -> add more to Weakset1 if needed
+// 4th commit -> add to WeakSet2 if needed.
+
+//weakset and weakmap are not suitable for accessing the values to then set the state
+
+// what are the constraints?
+// custom structure would need to be serializable
+//
+// changes array should be a stack, pop the last of the stack to process and call setState if there are any
+
+// now i think it's best to traverse the previous commit and apply the state that was there before if you want to travel
+
+// a structure that stores relevant data of each commit,
+// how to make sure that when we process a current or alternate that we know they are related/pointing to the same custom object?
+
+// CustomTree
+// root -> contains all component/fiber -> each fiber stores details about the current state and previous renders' states.
+//         also each node in this would contain the stateNode or memoizedState's dispatch in order to time travel when needed.
+//         when time travel, set a mode so that new commits won't be recorded. Or when the time travel function is called
+//         new commit's changes should be discarded. So when that "time-travel" commit is detected, reset the mode.
+// each node: would store similar properties but in an array.
+// a serialize method: serialize the custom tree so that there will be no circular references.
+
+//if that structure doesn't work, fall back to having different commits and compare the component inside that commit tree with the map
+// that would store the unique components to make sure they are the same across different commits before processing.
