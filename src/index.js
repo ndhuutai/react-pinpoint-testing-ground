@@ -24,6 +24,8 @@ ReactDOM.render(wtf, document.getElementById("root"));
 let changes = [];
 const processedFibers = new WeakMap();
 const fiberMap = new Map();
+const testWeakSet = new WeakSet();
+const stateNodeWeakSet = new WeakSet();
 
 function mountToReactRoot(reactRoot) {
   // Reset changes
@@ -57,11 +59,12 @@ function getSet(obj, propName) {
       console.log(`${obj} ${propName}`, this[newPropName]);
       changes.push(new Tree(this[newPropName]));
       console.log("CHANGES", changes);
-      console.log("Fiber STORE: ", processedFibers);
-      // console.log("testweakset after", testWeakSet);
+      // console.log("Fiber STORE: ", processedFibers);
+      console.log("testweakset after", testWeakSet);
       // console.log("statenodeweakset", stateNodeWeakSet);
-      console.log("fiber map:", fiberMap);
+      // console.log("fiber map:", fiberMap);
       getTotalRenderCount();
+      // whatChanged();
     },
   });
 }
@@ -93,26 +96,87 @@ function getTotalRenderCount() {
   // for each commit, loop through the array of trees
   // for each tree
   // check if the current component exist in the map before adding on or creating a new key
-  changes.forEach(commit => {
-    commit.componentList.forEach((component, index) => {
+  changes.forEach((commit, commitIndex) => {
+    commit.componentList.forEach((component, componentIndex) => {
       if (!componentMap.has(component.uID)) {
         componentMap.set(component.uID, { renderCount: 1 });
       } else {
         if (
-          component.effectTag !== 0 ||
-          component.selfBaseDuration !==
-            commit.componentList[index ? index - 1 : 0]
+          didFiberRender(
+            changes[commitIndex ? commitIndex - 1 : 0].componentList[
+              componentIndex
+            ],
+            component,
+          )
         ) {
           componentMap.get(component.uID).renderCount += 1;
         }
       }
     });
   });
-  console.log("render map", componentMap);
+  return componentMap;
 }
 
-const testWeakSet = new WeakSet();
-const stateNodeWeakSet = new WeakSet();
+function didFiberRender(prevFiber, nextFiber) {
+  switch (nextFiber.tag) {
+    case 0:
+    case 1:
+    case 3:
+      // case 5:
+      return (nextFiber.effectTag & 1) === 1;
+    default:
+      return (
+        prevFiber.memoizedProps !== nextFiber.memoizedProps ||
+        prevFiber.memoizedState !== nextFiber.memoizedState ||
+        prevFiber.ref !== nextFiber.ref
+      );
+  }
+}
+
+function didHooksChange(previous, next) {
+  if (previous == null || next == null) {
+    return false;
+  }
+  console.log("got here");
+  if (
+    next.hasOwnProperty("baseState") &&
+    next.hasOwnProperty("memoizedState") &&
+    next.hasOwnProperty("next") &&
+    next.hasOwnProperty("queue")
+  ) {
+    if (next.memoizedState !== previous.memoizedState) {
+      return true;
+    } else {
+    }
+  }
+  return false;
+}
+
+function getChangedKeys(previous, next) {
+  if (prev == null || next == null) {
+    return null;
+  }
+  // We can't report anything meaningful for hooks changes.
+  if (
+    next.hasOwnProperty("baseState") &&
+    next.hasOwnProperty("memoizedState") &&
+    next.hasOwnProperty("next") &&
+    next.hasOwnProperty("queue")
+  ) {
+    return null;
+  }
+
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  const changedKeys = [];
+  // eslint-disable-next-line no-for-of-loops/no-for-of-loops
+  for (const key of keys) {
+    if (prev[key] !== next[key]) {
+      changedKeys.push(key);
+    }
+  }
+
+  return changedKeys;
+}
 
 class TreeNode {
   constructor(fiberNode, uID) {
@@ -239,17 +303,18 @@ class Tree {
     if (!processedFibers.has(uniquePart)) {
       // processedFibers.add(fiberNode);
       // componentMap.set(this.uniqueId, fiberNode);
-      this.uniqueId++;
       id = this.uniqueId;
+      this.uniqueId++;
 
       fiberMap.set(id, fiberNode);
-      if (fiberNode.tag === 0) {
-        processedFibers.set(fiberNode.elementType, id);
-      } else if (fiberNode.tag === 3) {
-        processedFibers.set(fiberNode.memoizedState.element.type, id);
-      } else {
-        processedFibers.set(fiberNode.stateNode, id);
-      }
+      // if (fiberNode.tag === 0) {
+      //   processedFibers.set(fiberNode.elementType, id);
+      // } else if (fiberNode.tag === 3) {
+      //   processedFibers.set(fiberNode.memoizedState.element.type, id);
+      // } else {
+      //   processedFibers.set(fiberNode.stateNode, id);
+      // }
+      processedFibers.set(uniquePart, id);
     } else {
       id = processedFibers.get(uniquePart);
     }
@@ -298,16 +363,17 @@ class Tree {
     if (!processedFibers.has(uniquePart)) {
       // processedFibers.add(fiberNode);
       // componentMap.set(this.uniqueId, fiberNode);
-      this.uniqueId++;
       id = this.uniqueId;
+      this.uniqueId++;
       fiberMap.set(id, fiberNode);
-      if (fiberNode.tag === 0) {
-        processedFibers.set(fiberNode.elementType, id);
-      } else if (fiberNode.tag === 3) {
-        processedFibers.set(fiberNode.memoizedState.element.type, id);
-      } else {
-        processedFibers.set(fiberNode.stateNode, id);
-      }
+      // if (fiberNode.tag === 0) {
+      //   processedFibers.set(fiberNode.elementType, id);
+      // } else if (fiberNode.tag === 3) {
+      //   processedFibers.set(fiberNode.memoizedState.element.type, id);
+      // } else {
+      //   processedFibers.set(fiberNode.stateNode, id);
+      // }
+      processedFibers.set(uniquePart, id);
     } else {
       id = processedFibers.get(uniquePart);
     }
@@ -367,6 +433,10 @@ function SpyUseState(obj, method, cb) {
 }
 
 mountToReactRoot(root);
+
+let copyOfChanges = [...changes];
+
+copyOfChanges.forEach(commit => {});
 
 // changes[0].root.child.stateNode.setState({
 //   total: 0,
