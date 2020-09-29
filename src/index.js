@@ -39,6 +39,7 @@ function mountToReactRoot(reactRoot) {
   // after initial
   // console.log("Initial processed fibers", processedFibers);
   console.log("initial fiberMap", fiberMap);
+  console.log("CHANGES", changes);
 
   // Add listener to react fibers tree so changes can be recorded
   getSet(parent, "current");
@@ -59,8 +60,9 @@ function getSet(obj, propName) {
       console.log(`${obj} ${propName}`, this[newPropName]);
       changes.push(new Tree(this[newPropName]));
       console.log("CHANGES", changes);
+      console.log("scrubbed changes", scrubCircularReferences(changes));
       // console.log("Fiber STORE: ", processedFibers);
-      console.log("testweakset after", testWeakSet);
+      // console.log("testweakset after", testWeakSet);
       // console.log("statenodeweakset", stateNodeWeakSet);
       // console.log("fiber map:", fiberMap);
       getTotalRenderCount();
@@ -153,7 +155,7 @@ function didHooksChange(previous, next) {
 }
 
 function getChangedKeys(previous, next) {
-  if (prev == null || next == null) {
+  if (previous == null || next == null) {
     return null;
   }
   // We can't report anything meaningful for hooks changes.
@@ -166,11 +168,10 @@ function getChangedKeys(previous, next) {
     return null;
   }
 
-  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
   const changedKeys = [];
-  // eslint-disable-next-line no-for-of-loops/no-for-of-loops
   for (const key of keys) {
-    if (prev[key] !== next[key]) {
+    if (previous[key] !== next[key]) {
       changedKeys.push(key);
     }
   }
@@ -201,6 +202,7 @@ class TreeNode {
     this.updateQueue = updateQueue; // seems to be replaced entirely and since it exists directly under a fiber node, it can't be modified.
     this.tag = tag;
     this.updateList = [];
+    this.children = [];
 
     // stateNode can contain circular references depends on the fiber node
     if (tag === 5) {
@@ -262,8 +264,41 @@ class TreeNode {
     this.sibling = treeNode;
   }
 
-  addParent(node) {
+  addParent(treeNode) {
     // if (!node) return;
+    this.parent = treeNode;
+  }
+
+  toSerializable() {
+    let newObj = {};
+    let omitList = [
+      "memoizedProps",
+      "memoizedState",
+      "updateList",
+      "updateQueue",
+      "ref",
+      "elementType",
+      "stateNode",
+    ];
+
+    for (let key in this) {
+      if (omitList.indexOf(key) < 0) {
+        switch (key) {
+          case "parent":
+          case "sibling":
+          case "child":
+            newObj[`${key}ID`] = this[key].uID;
+            break;
+          case "children":
+            newObj[`childrenIDs`] = this[key].map(treeNode => treeNode.uID);
+            break;
+          default:
+            newObj[key] = this[key];
+        }
+      }
+    }
+
+    return newObj;
   }
 }
 
@@ -324,7 +359,7 @@ class Tree {
     if (fiberNode.tag === 3) {
       this.root = new TreeNode(fiberNode, id);
       // this.root = new TreeNode(fiberNode, this.uniqueId);
-      this.componentList.push({ ...this.root }); // push a copy
+      this.componentList.push(this.root); // push a copy
       // this.uniqueId++;
 
       if (fiberNode.child) {
@@ -336,21 +371,22 @@ class Tree {
       }
     } else {
       const newNode = new TreeNode(fiberNode, id);
-      // const newNode = new TreeNode(fiberNode, this.uniqueId);
+      newNode.addParent(previousTreeNode);
+      previousTreeNode.children.push(newNode);
       previousTreeNode.addChild(newNode);
-      this.componentList.push({ ...newNode });
+      this.componentList.push(newNode);
       // this.uniqueId++;
 
       if (fiberNode.child) {
         this.processNode(fiberNode.child, newNode);
       }
       if (fiberNode.sibling) {
-        this.processSiblingNode(fiberNode.sibling, newNode);
+        this.processSiblingNode(fiberNode.sibling, newNode, previousTreeNode);
       }
     }
   }
 
-  processSiblingNode(fiberNode, previousTreeNode) {
+  processSiblingNode(fiberNode, previousTreeNode, parentTreeNode) {
     let uniquePart = undefined;
     let id = undefined;
     if (fiberNode.tag === 0) {
@@ -379,16 +415,18 @@ class Tree {
     }
 
     const newNode = new TreeNode(fiberNode, id);
+    newNode.addParent(parentTreeNode);
+    parentTreeNode.children.push(newNode);
     // const newNode = new TreeNode(fiberNode, this.uniqueId);
     previousTreeNode.addSibling(newNode);
-    this.componentList.push({ ...newNode });
+    this.componentList.push(newNode);
     // this.uniqueId++;
 
     if (fiberNode.child) {
       this.processNode(fiberNode.child, newNode);
     }
     if (fiberNode.sibling) {
-      this.processSiblingNode(fiberNode.sibling, newNode);
+      this.processSiblingNode(fiberNode.sibling, newNode, parentTreeNode);
     }
   }
 }
@@ -432,66 +470,17 @@ function SpyUseState(obj, method, cb) {
   // return spy;
 }
 
+function scrubCircularReferences(changes) {
+  // loop through the different commits
+  // for every commit check the componentList
+  // scrub the circular references and leave the flat one there
+
+  let scrubChanges = changes.map(commit => {
+    return commit.componentList.map(component => {
+      return component.toSerializable();
+    });
+  });
+  return scrubChanges;
+}
+
 mountToReactRoot(root);
-
-let copyOfChanges = [...changes];
-
-copyOfChanges.forEach(commit => {});
-
-// changes[0].root.child.stateNode.setState({
-//   total: 0,
-//   next: 10,
-//   operation: null,
-// });
-
-console.log("processed fibers", processedFibers);
-// console.log("testWeakSET:", testWeakSet);
-// console.log("stateNodeWeakSet", stateNodeWeakSet);
-// console.log(processedFibers.get(2));
-
-// setTimeout(() => {
-//   processedFibers.get(2).stateNode.setState({
-//     total: "0",
-//     next: "10",
-//     operation: null,
-//   });
-// }, 4000);
-
-// setTimeout(() => {
-//   processedFibers.get(4).memoizedState.queue.dispatch(1);
-// }, 4000);
-
-// setTimeout(() => {
-//   processedFibers.get(4).memoizedState.queue.dispatch(3);
-// }, 6000);
-
-// maybe i should have a weak set to determine whether a fiber is processed
-// add/change fiber depends on the order/time that it was called
-
-// 1st commit -> add to WeakSet-1
-// 2nd commit -> add to WeakSet2
-// 3rd commit -> add more to Weakset1 if needed
-// 4th commit -> add to WeakSet2 if needed.
-
-//weakset and weakmap are not suitable for accessing the values to then set the state
-
-// what are the constraints?
-// custom structure would need to be serializable
-//
-// changes array should be a stack, pop the last of the stack to process and call setState if there are any
-
-// now i think it's best to traverse the previous commit and apply the state that was there before if you want to travel
-
-// a structure that stores relevant data of each commit,
-// how to make sure that when we process a current or alternate that we know they are related/pointing to the same custom object?
-
-// CustomTree
-// root -> contains all component/fiber -> each fiber stores details about the current state and previous renders' states.
-//         also each node in this would contain the stateNode or memoizedState's dispatch in order to time travel when needed.
-//         when time travel, set a mode so that new commits won't be recorded. Or when the time travel function is called
-//         new commit's changes should be discarded. So when that "time-travel" commit is detected, reset the mode.
-// each node: would store similar properties but in an array.
-// a serialize method: serialize the custom tree so that there will be no circular references.
-
-//if that structure doesn't work, fall back to having different commits and compare the component inside that commit tree with the map
-// that would store the unique components to make sure they are the same across different commits before processing.
